@@ -34,6 +34,12 @@ Site generation is performed with [make(1)](GNUmakefile) with several targets, n
  * `gzip` target creates compressed versions of the HTML and text content which is used by the production website.
 
 
+Markdown generation
+----------------------
+The make target `markdown` will generate [hugo](https://gohugo.io/) style markdown files for a subset of content. The primary usecase for these files is with  [nginx-hugo-theme](https://github.com/nginxinc/nginx-hugo-theme).
+
+This allows the `.xml` in this repo, to remain the source of truth for reference documenentation, while being made available at [docs.nginx.com](https://docs.nginx.com).
+
 Docker image
 ------------
 Use the [Dockerfile](Dockerfile) to create a self-container Docker image that approximates the production website.

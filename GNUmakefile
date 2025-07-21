@@ -385,8 +385,101 @@ copy_draft:
 	/usr/local/bin/copy_draft.sh $(NGINX_ORG)
 endif
 
+
+#
+# Targets and rules for generating Markdown files from XML using XSLT transformations.
+# Includes module documentation and directory and variable indexes.
+#
+
+MODULE_MD_XSLT = xslt/module-md.xslt
+XML_MODULE_DIR = xml/en/docs
+MD_OUT_DIR     = libxslt-md/
+MODULE_MD_DEPS = $(MODULE_MD_XSLT) dtd/module.dtd
+
+define MODULE_MD_XSLT_PROC
+	xsltproc --stringparam sourceFileName "$(1)" $(MODULE_MD_XSLT) "$(XML_MODULE_DIR)/$(1)" > "$(MD_OUT_DIR)/module-reference/$(basename $(1)).md"
+endef
+
+# Get list of XML module files (excluding the API head)
+XML_MODULE_FILES := $(shell grep -rl 'dtd/module.dtd' "$(XML_MODULE_DIR)" | grep -v 'http/ngx_http_api_module_head.xml' | sed 's|^$(XML_MODULE_DIR)/||')
+MD_MODULE_FILES := $(patsubst %.xml,$(MD_OUT_DIR)/module-reference/%.md,$(XML_MODULE_FILES))
+
+# API module related paths
+NGX_API_HEAD_XML   = $(XML_MODULE_DIR)/http/ngx_http_api_module_head.xml
+NGX_API_FIXED_XML  = $(XML_MODULE_DIR)/http/ngx_http_api_module_head_fixed.xml
+NGX_API_DEST_XML   = $(XML_MODULE_DIR)/http/ngx_http_api_module.xml
+NGX_API_MD         = $(MD_OUT_DIR)/module-reference/http/ngx_api_module.md
+
+# Hacks for inplace ngx_http_api file manipulation
+# Step 1: Fix original file (add </module> if missing)
+$(NGX_API_FIXED_XML): $(NGX_API_HEAD_XML)
+	@echo "Fixing $< (ensuring </module>) -> $@"
+	@cp $< $@
+	@grep -q '</module>' $@ || echo '</module>' >> $@
+
+# Step 2: Copy fixed file to final location
+$(NGX_API_DEST_XML): $(NGX_API_FIXED_XML)
+	@echo "Copying fixed XML to $@"
+	@cp -f $< $@
+
+# Step 3: Process via XSLT to markdown
+$(NGX_API_MD): $(NGX_API_DEST_XML) $(MODULE_MD_DEPS)
+	@mkdir -p "$(dir $@)"
+	@echo "Processing ngx_http_api_module.xml -> ngx_api_module.md"
+	$(call MODULE_MD_XSLT_PROC,http/ngx_http_api_module.xml)
+
+# Entry point for API module handling
+.PHONY: ngx-api-prepare
+ngx-api-prepare: $(NGX_API_MD)
+
+# Generic XSLT processing for all other modules
+$(MD_OUT_DIR)/module-reference/%.md: $(XML_MODULE_DIR)/%.xml $(MODULE_MD_DEPS) ngx-api-prepare
+	@if [ "$<" = "$(NGX_API_HEAD_XML)" ]; then \
+		echo "Skipping $< (handled separately)"; \
+		exit 0; \
+	fi
+	@mkdir -p "$(dir $@)"
+	@echo "Processing $< -> $@"
+	$(call MODULE_MD_XSLT_PROC,$*.xml)
+
+# Index generation macros
+define generate-index-md
+	@mkdir -p "$(dir $3)"
+	@echo "Processing $1 -> $3"
+	xsltproc -o $3 $2 $1
+endef
+
+# Directory index
+.PHONY: dirindex-markdown
+DIRINDEX_XML = $(XML_MODULE_DIR)/dirindex.xml
+DIRINDEX_MD = $(MD_OUT_DIR)/directives.md
+DIRINDEX_XSLT = xslt/dirindex-md.xslt
+
+dirindex-markdown: $(DIRINDEX_MD)
+
+$(DIRINDEX_MD): $(DIRINDEX_XML) $(DIRINDEX_XSLT)
+	$(call generate-index-md,$(DIRINDEX_XML),$(DIRINDEX_XSLT),$(DIRINDEX_MD))
+
+# Variable index
+.PHONY: varindex-markdown
+VARINDEX_XML = $(XML_MODULE_DIR)/varindex.xml
+VARINDEX_MD = $(MD_OUT_DIR)/variables.md
+VARINDEX_XSLT = xslt/varindex-md.xslt
+
+varindex-markdown: $(VARINDEX_MD)
+
+$(VARINDEX_MD): $(VARINDEX_XML) $(VARINDEX_XSLT)
+	$(call generate-index-md,$(VARINDEX_XML),$(VARINDEX_XSLT),$(VARINDEX_MD))
+
+# All-in-one target
+.PHONY: markdown
+markdown: ngx-api-prepare $(MD_MODULE_FILES) dirindex-markdown varindex-markdown
+	@echo "All module, dirindex, varindex, and API module XML files converted successfully."
+
+# Cleanup
 clean:
-	rm -rf $(ZIP) $(OUT) xml/*/docs/dirindex.xml dir.map 		\
-	xml/*/docs/varindex.xml
+	rm -rf $(ZIP) $(OUT) $(MD_OUT_DIR) xml/*/docs/dirindex.xml dir.map \
+	xml/*/docs/varindex.xml \
+	$(NGX_API_FIXED_XML) $(NGX_API_DEST_XML)
 
 .DELETE_ON_ERROR:
