@@ -29,6 +29,7 @@ jobs:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       AWS_ROLE_NAME: ${{ secrets.AWS_ROLE_NAME }}
       ALLOWED_USERS: ${{ secrets.ALLOWED_USERS }}
+      
 
     if: |
       (github.event_name == 'push')
