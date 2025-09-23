@@ -422,7 +422,13 @@
   </xsl:template>
 
   <xsl:template match="tag-name">
-    <xsl:text>&#10;### </xsl:text>
+    <!-- At times, source directive may include a list of tags in the example
+         As we don't want tags embedded within directives to display in the sidebar
+         Only apply h4 when not within a directive
+    -->
+    <xsl:if test="not(ancestor::directive)">
+      <xsl:text>&#10;### </xsl:text>
+    </xsl:if>
     <xsl:choose>
       <!-- base+placeholder pattern -->
       <xsl:when test="var and value">
