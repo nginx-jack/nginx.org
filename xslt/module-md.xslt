@@ -193,18 +193,16 @@
 
   <xsl:template match="link[@doc]">
     <xsl:variable name="markdownPath">
-      <xsl:text>/nginx/module-reference/</xsl:text>
       <xsl:choose>
         <xsl:when test="contains(@doc, '/')">
+          <xsl:if test="not(contains(@doc, '..'))">
+            <xsl:text>/nginx/module-reference/</xsl:text>
+          </xsl:if>
           <!-- explicit path, leave as-is (removing .xml extension) -->
           <xsl:value-of select="substring-before(@doc, '.xml')" />
         </xsl:when>
         <xsl:otherwise>
           <!-- just filename.xml: prepend current directory if needed -->
-          <xsl:if test="$currentDir != '.'">
-            <xsl:value-of select="$currentDir" />
-            <xsl:text>/</xsl:text>
-          </xsl:if>
           <xsl:value-of select="substring-before(@doc, '.xml')" />
         </xsl:otherwise>
       </xsl:choose>
@@ -230,11 +228,26 @@
       </xsl:otherwise>
     </xsl:choose>
     <xsl:text>](</xsl:text>
-    <xsl:value-of select="$markdownPath" />
-    <xsl:if test="@id">
-      <xsl:text>#</xsl:text>
-      <xsl:value-of select="@id" />
-    </xsl:if>
+
+    <xsl:choose>
+      <!-- Handles cases where just an id attr is passed      -->
+      <xsl:when test="@id and not(@doc)">
+        <xsl:text>#</xsl:text>
+        <xsl:value-of select="@id" />
+      </xsl:when>
+      <!-- Handles cases where both an id attr and doc is passed, concat the two      -->
+      <xsl:when test="@id and @doc">
+        <xsl:text>{{&lt; relref "</xsl:text>
+        <xsl:value-of select="concat($markdownPath, '#', @id)" />
+        <xsl:text>" >}}</xsl:text>
+      </xsl:when>
+      <!-- Handles the rest of cases where only a doc attr is passed, concat the two      -->
+      <xsl:otherwise>
+        <xsl:text>{{&lt; relref "</xsl:text>
+          <xsl:value-of select="$markdownPath" />
+        <xsl:text>" >}}</xsl:text>
+      </xsl:otherwise>
+    </xsl:choose>
     <xsl:text>)</xsl:text>
   </xsl:template>
 
@@ -311,6 +324,7 @@
     <xsl:text>&#10;&#10;</xsl:text>
 
     <!-- Syntax -->
+    <!-- Ocassionally (like ngx_http_core_module) there may be more than one syntax node, needs fix  -->
     <xsl:for-each select="syntax">
       <xsl:text>**Syntax:** </xsl:text>
       <xsl:value-of select="../@name" />
