@@ -184,6 +184,15 @@
     <xsl:apply-templates />
   </xsl:template>
 
+  <xsl:template match="link[@id]">
+    <xsl:text>[</xsl:text>
+    <xsl:value-of select="@id" />
+    <xsl:text>]</xsl:text>
+    <xsl:text>(#</xsl:text>
+    <xsl:value-of select="@id" />
+    <xsl:text>)</xsl:text>
+  </xsl:template>
+
   <xsl:template match="link">
     <xsl:text>[</xsl:text><xsl:apply-templates /><xsl:text>](</xsl:text>
     <xsl:value-of select="@doc" />
